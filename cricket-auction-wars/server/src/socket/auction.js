@@ -133,9 +133,11 @@ module.exports = function registerAuctionHandlers(io) {
             room.lastWinner = null;
             room.lastWinnerTeamName = null;
 
-            if (!room.unsoldPlayers.some(
-              (id) => String(id) === String(playerId)
-            )) {
+            if (
+              !room.unsoldPlayers.some(
+                (id) => String(id) === String(playerId)
+              )
+            ) {
               room.unsoldPlayers.push(playerId);
             }
           }
@@ -145,9 +147,11 @@ module.exports = function registerAuctionHandlers(io) {
           room.lastWinner = null;
           room.lastWinnerTeamName = null;
 
-          if (!room.unsoldPlayers.some(
-            (id) => String(id) === String(playerId)
-          )) {
+          if (
+            !room.unsoldPlayers.some(
+              (id) => String(id) === String(playerId)
+            )
+          ) {
             room.unsoldPlayers.push(playerId);
           }
         }
@@ -237,6 +241,7 @@ module.exports = function registerAuctionHandlers(io) {
     });
   }
 
+  // Socket authentication
   io.use((socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
@@ -254,6 +259,7 @@ module.exports = function registerAuctionHandlers(io) {
     }
   });
 
+  // Watchdog for expired auctions
   const watchdog = setInterval(async () => {
     try {
       const expiredRooms = await Room.find({
@@ -272,6 +278,7 @@ module.exports = function registerAuctionHandlers(io) {
   if (watchdog.unref) watchdog.unref();
 
   io.on("connection", (socket) => {
+    // Room joining
     socket.on("room:join", async ({ code }) => {
       try {
         const roomCode = String(code || "").toUpperCase();
@@ -291,8 +298,11 @@ module.exports = function registerAuctionHandlers(io) {
 
         socket.join(roomCode);
 
+        // Fetch the latest room state after joining
         const snapshot = await roomSnapshot(roomCode);
-        socket.emit("auction:state", snapshot);
+
+        // Broadcast the updated room state to ALL players, including the host
+        io.to(roomCode).emit("auction:state", snapshot);
 
         if (room.status === "live" && room.endsAt) {
           schedule(
@@ -301,10 +311,12 @@ module.exports = function registerAuctionHandlers(io) {
           );
         }
       } catch (error) {
+        console.error("Room join error:", error);
         socket.emit("auction:error", "Could not join room");
       }
     });
 
+    // Bidding
     socket.on("auction:bid", async ({ code, amount }, ack = () => {}) => {
       const roomCode = String(code || "").toUpperCase();
 
@@ -402,3 +414,4 @@ module.exports = function registerAuctionHandlers(io) {
     });
   });
 };
+
